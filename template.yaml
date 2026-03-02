@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Tenant Alarm Dashboard System
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Timeout: 10
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,OPTIONS'"
+      AllowHeaders: "'Content-Type'"
+      AllowOrigin: "'*'"
+
+Resources:
+
+  
+  # DynamoDB Table
+  
+  TenantTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TenantMappingTable
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: tenantName
+          AttributeType: S
+      KeySchema:
+        - AttributeName: tenantName
+          KeyType: HASH
+
+  
+  # SNS Topic
+  
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: TenantAlarmTopic
+
+  
+  # Tenant A Lambda
+  
+  TenantALambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: TenantALambda
+      CodeUri: tenant_a/
+      Handler: app.lambda_handler
+      Environment:
+        Variables:
+          MUTE_ALARM: "false"
+          SNS_TOPIC_ARN: !Ref AlarmTopic
+      Policies:
+        - SNSPublishMessagePolicy:
+            TopicName: TenantAlarmTopic
+
+  
+  # Manager Lambda
+  
+  ManagerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: manager/
+      Handler: app.lambda_handler
+      Environment:
+        Variables:
+          TABLE_NAME: TenantMappingTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: TenantMappingTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - lambda:UpdateFunctionConfiguration
+                - lambda:GetFunctionConfiguration
+              Resource: "arn:aws:lambda:us-east-1:*:function:Tenant*"
+      Events:
+        ToggleApi:
+          Type: Api
+          Properties:
+            Path: /toggle
+            Method: post
+
+        GetStatusApi:
+          Type: Api
+          Properties:
+            Path: /status
+            Method: get

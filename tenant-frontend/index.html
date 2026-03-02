@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Tenant Monitoring Dashboard</title>
+<style>
+body {font-family:Arial;background:#f5f6fa;padding:40px;}
+table {width:100%;border-collapse:collapse;background:white;}
+th,td {padding:10px;border:1px solid #ddd;text-align:center;}
+th {background:#2f3640;color:white;}
+.ok {background:#2ecc71;color:white;padding:4px 8px;}
+.high {background:#e74c3c;color:white;padding:4px 8px;}
+.switch {position:relative;display:inline-block;width:50px;height:24px;}
+.switch input {opacity:0;width:0;height:0;}
+.slider {position:absolute;cursor:pointer;background:#ccc;border-radius:34px;top:0;left:0;right:0;bottom:0;transition:.4s;}
+.slider:before {position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.4s;}
+input:checked + .slider {background:#2ecc71;}
+input:checked + .slider:before {transform:translateX(26px);}
+</style>
+</head>
+<body>
+
+<h2>Tenant Alarm Monitoring Dashboard</h2>
+
+<table id="dashboard">
+<thead>
+<tr>
+<th>Alarm On/Off</th>
+<th>Tenant</th>
+<th>WebServer CPU</th>
+<th>WebServer Memory</th>
+<th>tm1 CPU</th>
+<th>tm1 Memory</th>
+<th>Endpoint - HealthCheck (using DNS Endpoint)</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<script>
+const API_BASE = "https://daurnjq95b.execute-api.us-east-1.amazonaws.com/Prod";
+
+function loadDashboard() {
+fetch(API_BASE + "/status")
+.then(res => res.json())
+.then(data => {
+const tbody = document.querySelector("#dashboard tbody");
+tbody.innerHTML = "";
+data.forEach(tenant => {
+const row = document.createElement("tr");
+row.innerHTML = `
+<td>
+<label class="switch">
+<input type="checkbox" ${tenant.alarmMuted ? '' : 'checked'}
+onchange="toggleAlarm('${tenant.tenantName}', this)">
+<span class="slider"></span>
+</label>
+</td>
+<td>${tenant.tenantName}</td>
+<td><span class="${tenant.webCpu==='OK'?'ok':'high'}">${tenant.webCpu}</span></td>
+<td><span class="${tenant.webMemory==='OK'?'ok':'high'}">${tenant.webMemory}</span></td>
+<td><span class="${tenant.tm1Cpu==='OK'?'ok':'high'}">${tenant.tm1Cpu}</span></td>
+<td><span class="${tenant.tm1Memory==='OK'?'ok':'high'}">${tenant.tm1Memory}</span></td>
+<td>${tenant.endpointHealth}</td>
+`;
+tbody.appendChild(row);
+});
+});
+}
+
+function toggleAlarm(tenantName, checkbox) {
+const action = checkbox.checked ? "turn_on" : "turn_off";
+fetch(API_BASE + "/toggle", {
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({tenantName:tenantName,action:action})
+}).then(() => loadDashboard());
+}
+
+loadDashboard();
+</script>
+
+</body>
+</html>
