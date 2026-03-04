@@ -2,6 +2,7 @@
 <html>
 <head>
 <title>Tenant Monitoring Dashboard</title>
+
 <style>
 body {font-family:Arial;background:#f5f6fa;padding:40px;}
 table {width:100%;border-collapse:collapse;background:white;}
@@ -15,11 +16,16 @@ th {background:#2f3640;color:white;}
 .slider:before {position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.4s;}
 input:checked + .slider {background:#2ecc71;}
 input:checked + .slider:before {transform:translateX(26px);}
+.loading {margin-bottom:15px;font-weight:bold;}
+.error {color:red;margin-bottom:15px;}
 </style>
+
 </head>
 <body>
 
 <h2>Tenant Alarm Monitoring Dashboard</h2>
+
+<div id="message"></div>
 
 <table id="dashboard">
 <thead>
@@ -37,46 +43,107 @@ input:checked + .slider:before {transform:translateX(26px);}
 </table>
 
 <script>
-const API_BASE = "https://daurnjq95b.execute-api.us-east-1.amazonaws.com/Prod";
 
-function loadDashboard() {
-fetch(API_BASE + "/status")
-.then(res => res.json())
-.then(data => {
-const tbody = document.querySelector("#dashboard tbody");
-tbody.innerHTML = "";
-data.forEach(tenant => {
-const row = document.createElement("tr");
-row.innerHTML = `
-<td>
-<label class="switch">
-<input type="checkbox" ${tenant.alarmMuted ? '' : 'checked'}
-onchange="toggleAlarm('${tenant.tenantName}', this)">
-<span class="slider"></span>
-</label>
-</td>
-<td>${tenant.tenantName}</td>
-<td><span class="${tenant.webCpu==='OK'?'ok':'high'}">${tenant.webCpu}</span></td>
-<td><span class="${tenant.webMemory==='OK'?'ok':'high'}">${tenant.webMemory}</span></td>
-<td><span class="${tenant.tm1Cpu==='OK'?'ok':'high'}">${tenant.tm1Cpu}</span></td>
-<td><span class="${tenant.tm1Memory==='OK'?'ok':'high'}">${tenant.tm1Memory}</span></td>
-<td>${tenant.endpointHealth}</td>
-`;
-tbody.appendChild(row);
-});
-});
+const API_BASE = "https://d4m04i05r8.execute-api.us-east-1.amazonaws.com/Prod";
+
+const messageDiv = document.getElementById("message");
+
+function showMessage(text, type="loading") {
+    messageDiv.className = type;
+    messageDiv.innerText = text;
 }
 
+function loadDashboard() {
+
+    showMessage("Loading dashboard...", "loading");
+
+    fetch(API_BASE + "/status")
+    .then(res => {
+        if (!res.ok) {
+            throw new Error("Failed to fetch dashboard data");
+        }
+        return res.json();
+    })
+    .then(data => {
+
+        console.log("Dashboard Data:", data);
+
+        const tbody = document.querySelector("#dashboard tbody");
+        tbody.innerHTML = "";
+
+        if (data.length === 0) {
+            showMessage("No tenants found.", "error");
+            return;
+        }
+
+        showMessage("");
+
+        data.forEach(tenant => {
+
+            const row = document.createElement("tr");
+
+            row.innerHTML = `
+            <td>
+                <label class="switch">
+                    <input type="checkbox" 
+                        ${tenant.alarmMuted ? '' : 'checked'}
+                        onchange="toggleAlarm('${tenant.tenantName}', this)">
+                    <span class="slider"></span>
+                </label>
+            </td>
+            <td>${tenant.tenantName}</td>
+            <td><span class="${tenant.webCpu==='OK'?'ok':'high'}">${tenant.webCpu}</span></td>
+            <td><span class="${tenant.webMemory==='OK'?'ok':'high'}">${tenant.webMemory}</span></td>
+            <td><span class="${tenant.tm1Cpu==='OK'?'ok':'high'}">${tenant.tm1Cpu}</span></td>
+            <td><span class="${tenant.tm1Memory==='OK'?'ok':'high'}">${tenant.tm1Memory}</span></td>
+            <td>${tenant.endpointHealth}</td>
+            `;
+
+            tbody.appendChild(row);
+        });
+    })
+    .catch(err => {
+        console.error("Error:", err);
+        showMessage("Error loading dashboard.", "error");
+    });
+}
+
+
 function toggleAlarm(tenantName, checkbox) {
-const action = checkbox.checked ? "turn_on" : "turn_off";
-fetch(API_BASE + "/toggle", {
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({tenantName:tenantName,action:action})
-}).then(() => loadDashboard());
+
+    const action = checkbox.checked ? "turn_on" : "turn_off";
+
+    showMessage("Updating alarm status...", "loading");
+
+    fetch(API_BASE + "/toggle", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            tenantName: tenantName,
+            action: action
+        })
+    })
+    .then(res => {
+        if (!res.ok) {
+            throw new Error("Failed to update alarm");
+        }
+        return res.json();
+    })
+    .then(data => {
+        console.log("Toggle Response:", data);
+        showMessage("Alarm updated successfully.");
+        loadDashboard();
+    })
+    .catch(err => {
+        console.error("Toggle Error:", err);
+        showMessage("Error updating alarm.", "error");
+    });
 }
 
 loadDashboard();
+
 </script>
 
 </body>

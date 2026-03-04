@@ -10,17 +10,7 @@ def lambda_handler(event, context):
 
     if mute == "true":
         print("Tenant A alarm muted.")
-        return {
-            "statusCode": 200,
-            "body": "Alarm muted"
-        }
-
-    if not topic_arn:
-        print("SNS_TOPIC_ARN missing.")
-        return {
-            "statusCode": 500,
-            "body": "SNS topic not configured"
-        }
+        return
 
     sns.publish(
         TopicArn=topic_arn,
@@ -29,8 +19,3 @@ def lambda_handler(event, context):
     )
 
     print("Notification sent for Tenant A")
-
-    return {
-        "statusCode": 200,
-        "body": "Notification sent"
-    }

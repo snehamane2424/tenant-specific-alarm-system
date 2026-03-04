@@ -14,9 +14,8 @@ Globals:
 
 Resources:
 
-  
-  # DynamoDB Table
-  
+   # DynamoDB Table
+
   TenantTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -29,17 +28,19 @@ Resources:
         - AttributeName: tenantName
           KeyType: HASH
 
-  
-  # SNS Topic
-  
+    
+
+# SNS Topic
+
   AlarmTopic:
     Type: AWS::SNS::Topic
     Properties:
       TopicName: TenantAlarmTopic
 
-  
-  # Tenant A Lambda
-  
+      
+
+# Tenant A Lambda
+
   TenantALambda:
     Type: AWS::Serverless::Function
     Properties:
@@ -54,9 +55,10 @@ Resources:
         - SNSPublishMessagePolicy:
             TopicName: TenantAlarmTopic
 
-  
-  # Manager Lambda
-  
+
+ 
+# Manager Lambda
+
   ManagerFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -71,18 +73,19 @@ Resources:
         - Statement:
             - Effect: Allow
               Action:
-                - lambda:UpdateFunctionConfiguration
                 - lambda:GetFunctionConfiguration
+                - lambda:UpdateFunctionConfiguration
+                - lambda:InvokeFunction
               Resource: "arn:aws:lambda:us-east-1:*:function:Tenant*"
       Events:
-        ToggleApi:
-          Type: Api
-          Properties:
-            Path: /toggle
-            Method: post
-
         GetStatusApi:
           Type: Api
           Properties:
             Path: /status
             Method: get
+
+        ToggleApi:
+          Type: Api
+          Properties:
+            Path: /toggle
+            Method: post
