@@ -14,7 +14,7 @@ Globals:
 
 Resources:
 
-   # DynamoDB Table
+ # DynamoDB Table
 
   TenantTable:
     Type: AWS::DynamoDB::Table
@@ -28,7 +28,6 @@ Resources:
         - AttributeName: tenantName
           KeyType: HASH
 
-    
 
 # SNS Topic
 
@@ -37,7 +36,6 @@ Resources:
     Properties:
       TopicName: TenantAlarmTopic
 
-      
 
 # Tenant A Lambda
 
@@ -56,8 +54,9 @@ Resources:
             TopicName: TenantAlarmTopic
 
 
- 
+
 # Manager Lambda
+
 
   ManagerFunction:
     Type: AWS::Serverless::Function

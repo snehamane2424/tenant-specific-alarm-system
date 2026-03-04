@@ -26,13 +26,10 @@ def lambda_handler(event, context):
     table = dynamodb.Table(TABLE_NAME)
     method = event.get("httpMethod", "")
 
-    # Handle preflight
     if method == "OPTIONS":
         return build_response(200, "OK")
 
-    
-    # --------------- GET /status -----------------
-    
+    # ---------------- GET /status ----------------
     if method == "GET":
 
         response = table.scan()
@@ -41,22 +38,15 @@ def lambda_handler(event, context):
         dashboard_data = []
 
         for tenant in tenants:
+
             function_name = tenant["lambdaName"]
 
-            # Get real Lambda configuration
             config = lambda_client.get_function_configuration(
                 FunctionName=function_name
             )
 
             env_vars = config.get("Environment", {}).get("Variables", {})
             mute_value = env_vars.get("MUTE_ALARM", "false") == "true"
-
-            # Sync DynamoDB alarmMuted automatically
-            table.update_item(
-                Key={"tenantName": tenant["tenantName"]},
-                UpdateExpression="SET alarmMuted = :val",
-                ExpressionAttributeValues={":val": mute_value}
-            )
 
             dashboard_data.append({
                 "tenantName": tenant["tenantName"],
@@ -70,17 +60,12 @@ def lambda_handler(event, context):
 
         return build_response(200, dashboard_data)
 
-    
-    # ---------------- POST /toggle ------------------
-    
+    # ---------------- POST /toggle ----------------
     if method == "POST":
 
         body = json.loads(event.get("body", "{}"))
         tenant_name = body.get("tenantName")
         action = body.get("action")
-
-        if not tenant_name or not action:
-            return build_response(400, "Invalid request")
 
         response = table.get_item(Key={"tenantName": tenant_name})
 
@@ -88,9 +73,9 @@ def lambda_handler(event, context):
             return build_response(404, "Tenant not found")
 
         function_name = response["Item"]["lambdaName"]
+
         mute_value = action == "turn_off"
 
-        ### Get current environment variables
         config = lambda_client.get_function_configuration(
             FunctionName=function_name
         )
@@ -98,38 +83,27 @@ def lambda_handler(event, context):
         env_vars = config.get("Environment", {}).get("Variables", {})
         env_vars["MUTE_ALARM"] = str(mute_value).lower()
 
-        ### ------------ Update Lambda configuration -------------------
+
+### ------------ Update Lambda configuration -------------------
+
         lambda_client.update_function_configuration(
             FunctionName=function_name,
             Environment={"Variables": env_vars}
         )
 
-        ### ---------------- WAIT until Lambda update completes --------------
+### ------------wait untill update finishes ------------------
         waiter = lambda_client.get_waiter('function_updated')
         waiter.wait(FunctionName=function_name)
 
-        ### ------------ Confirm actual updated state ---------------
-        updated_config = lambda_client.get_function_configuration(
-            FunctionName=function_name
-        )
 
-        updated_env = updated_config.get("Environment", {}).get("Variables", {})
-        confirmed_value = updated_env.get("MUTE_ALARM", "false") == "true"
+ # ---------------- Auto invoke tenant Lambda when alarm turned ON ---------------
 
-        # ---------------- Sync DynamoDB with confirmed value ----------------
-        table.update_item(
-            Key={"tenantName": tenant_name},
-            UpdateExpression="SET alarmMuted = :val",
-            ExpressionAttributeValues={":val": confirmed_value}
-        )
-
-        # ---------------- Auto invoke tenant Lambda when alarm turned ON ---------------
-        if not confirmed_value:
+        if not mute_value:
             lambda_client.invoke(
                 FunctionName=function_name,
                 InvocationType='Event'
             )
 
-        return build_response(200, "Toggle updated and synced successfully")
+        return build_response(200, "Alarm state updated")
 
     return build_response(405, "Method not allowed")
